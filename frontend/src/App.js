@@ -20,7 +20,7 @@ function App() {
 
   const loadState = async (userId) => {
     try {
-      const res = await axios.post('http://localhost:8001/state/query', {
+      const res = await axios.post('process.env.REACT_APP_API_URL/state/query', {
         user_id: userId
       });
       setState(res.data);
@@ -33,7 +33,7 @@ function App() {
     setLoading(true);
     const userId = `user_${Date.now()}`;
     try {
-      await axios.post(`http://localhost:8001/state/initialize?user_id=${userId}`);
+      await axios.post(`process.env.REACT_APP_API_URL/state/initialize?user_id=${userId}`);
       const newUser = { id: userId, name: 'Professional User' };
       localStorage.setItem('aclsa_user', JSON.stringify(newUser));
       setUser(newUser);
@@ -119,7 +119,7 @@ function Dashboard({ state, userId, onRefresh }) {
 
   const addSkill = async () => {
     try {
-      await axios.post('http://localhost:8001/state/node', {
+      await axios.post('process.env.REACT_APP_API_URL/state/node', {
         user_id: userId,
         node_type: 'skill',
         attributes: { name: 'Python Programming', proficiency: 0.75, hours: 400 }
@@ -181,7 +181,7 @@ function Skills({ state, userId, onRefresh }) {
 
   const addSkill = async () => {
     try {
-      await axios.post('http://localhost:8001/state/node', {
+      await axios.post('process.env.REACT_APP_API_URL/state/node', {
         user_id: userId,
         node_type: 'skill',
         attributes: newSkill
