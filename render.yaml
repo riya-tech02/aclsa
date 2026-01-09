@@ -1,27 +1,38 @@
 services:
+  # API Gateway
   - type: web
     name: aclsa-api
-    env: docker
+    runtime: docker
     dockerfilePath: ./services/api_gateway/Dockerfile
     dockerContext: ./services/api_gateway
-    plan: free
+    envVars:
+      - key: PORT
+        value: 8000
     healthCheckPath: /health
-    
+
+  # State Service
+  - type: web
+    name: aclsa-state
+    runtime: docker
+    dockerfilePath: ./services/state_service/Dockerfile
+    dockerContext: ./services/state_service
+    envVars:
+      - key: PORT
+        value: 8001
+
+  # Frontend
   - type: web
     name: aclsa-frontend
-    env: docker
+    runtime: docker
     dockerfilePath: ./frontend/Dockerfile
     dockerContext: ./frontend
-    plan: free
     envVars:
+      - key: PORT
+        value: 3000
       - key: REACT_APP_API_URL
-        fromService:
-          type: web
-          name: aclsa-api
-          property: host
+        value: https://aclsa-api.onrender.com
 
 databases:
-  - name: aclsa-postgres
+  - name: aclsa-db
     databaseName: aclsa
     user: aclsa_user
-    plan: free
