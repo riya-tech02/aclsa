@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: aclsa-api
+    env: docker
+    dockerfilePath: ./services/api_gateway/Dockerfile
+    dockerContext: ./services/api_gateway
+    plan: free
+    healthCheckPath: /health
+    
+  - type: web
+    name: aclsa-frontend
+    env: docker
+    dockerfilePath: ./frontend/Dockerfile
+    dockerContext: ./frontend
+    plan: free
+    envVars:
+      - key: REACT_APP_API_URL
+        fromService:
+          type: web
+          name: aclsa-api
+          property: host
+
+databases:
+  - name: aclsa-postgres
+    databaseName: aclsa
+    user: aclsa_user
+    plan: free

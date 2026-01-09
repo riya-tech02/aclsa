@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: state-service
+  namespace: aclsa-prod
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: state-service
+  template:
+    metadata:
+      labels:
+        app: state-service
+    spec:
+      containers:
+      - name: state-service
+        image: YOUR_REGISTRY/aclsa-state:latest
+        ports:
+        - containerPort: 8001
+        env:
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: aclsa-secrets
+              key: db-password
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: aclsa-prod
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: api-gateway
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+    spec:
+      containers:
+      - name: api-gateway
+        image: YOUR_REGISTRY/aclsa-gateway:latest
+        ports:
+        - containerPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: aclsa-prod
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+      - name: frontend
+        image: YOUR_REGISTRY/aclsa-frontend:latest
+        ports:
+        - containerPort: 80
