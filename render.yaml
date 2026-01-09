@@ -1,22 +1,9 @@
 services:
   - type: web
     name: aclsa-api
-    runtime: docker
-    dockerfilePath: ./services/api_gateway/Dockerfile
-    buildCommand: cd services/api_gateway && docker build -t aclsa-api .
+    runtime: python
+    buildCommand: pip install -r services/api_gateway/requirements.txt
     startCommand: cd services/api_gateway && uvicorn app:app --host 0.0.0.0 --port $PORT
-    env: python
-    plan: free
-
-  - type: web
-    name: aclsa-state
-    runtime: docker
-    dockerfilePath: ./services/state_service/Dockerfile
-    startCommand: cd services/state_service && uvicorn app:app --host 0.0.0.0 --port $PORT
-    env: python
-    plan: free
-
-databases:
-  - name: aclsa-db
-    databaseName: aclsa
-    plan: free
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11
