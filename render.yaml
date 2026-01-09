@@ -1,38 +1,22 @@
 services:
-  # API Gateway
   - type: web
     name: aclsa-api
     runtime: docker
     dockerfilePath: ./services/api_gateway/Dockerfile
-    dockerContext: ./services/api_gateway
-    envVars:
-      - key: PORT
-        value: 8000
-    healthCheckPath: /health
+    buildCommand: cd services/api_gateway && docker build -t aclsa-api .
+    startCommand: cd services/api_gateway && uvicorn app:app --host 0.0.0.0 --port $PORT
+    env: python
+    plan: free
 
-  # State Service
   - type: web
     name: aclsa-state
     runtime: docker
     dockerfilePath: ./services/state_service/Dockerfile
-    dockerContext: ./services/state_service
-    envVars:
-      - key: PORT
-        value: 8001
-
-  # Frontend
-  - type: web
-    name: aclsa-frontend
-    runtime: docker
-    dockerfilePath: ./frontend/Dockerfile
-    dockerContext: ./frontend
-    envVars:
-      - key: PORT
-        value: 3000
-      - key: REACT_APP_API_URL
-        value: https://aclsa-api.onrender.com
+    startCommand: cd services/state_service && uvicorn app:app --host 0.0.0.0 --port $PORT
+    env: python
+    plan: free
 
 databases:
   - name: aclsa-db
     databaseName: aclsa
-    user: aclsa_user
+    plan: free
