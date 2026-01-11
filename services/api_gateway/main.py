@@ -16,6 +16,13 @@ app.add_middleware(
 @app.post("/message")
 def message(user_id: str, text: str):
     return {"response": handle_message(user_id, text)}
+@app.get("/")
+def root():
+    return {
+        "service": "ACLSA Agent",
+        "status": "running",
+        "docs": "/docs"
+    }
 
 @app.get("/health")
 def health():
