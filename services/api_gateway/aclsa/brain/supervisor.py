@@ -1,10 +1,9 @@
 from aclsa.brain.dialog_state import get_state, set_state
-import requests
 
-MEMORY_URL = "http://memory:8002/memory/store"
-PLANNING_URL = "http://planning:8003/planning/simulate"
-RL_URL = "http://rl:8004/rl/decide"
-
+# local imports instead of HTTP
+from services.memory_service.app import store_memory
+from services.planning_service.app import simulate_trajectories
+from services.rl_service.app import make_decision
 
 def handle_message(user_id: str, text: str):
     state = get_state(user_id)
@@ -15,7 +14,7 @@ def handle_message(user_id: str, text: str):
 
     if state["phase"] == "WAITING_EMAIL":
         if "@" in text:
-            requests.post(MEMORY_URL, json={
+            store_memory({
                 "user_id": user_id,
                 "content": text,
                 "memory_type": "email",
@@ -26,25 +25,25 @@ def handle_message(user_id: str, text: str):
         return "Please provide a valid email."
 
     if state["phase"] == "WAITING_GOAL":
-        requests.post(MEMORY_URL, json={
+        store_memory({
             "user_id": user_id,
             "content": text,
             "memory_type": "goal",
             "importance": 0.9
         })
 
-        plan = requests.post(PLANNING_URL, json={
+        plan = simulate_trajectories({
             "user_id": user_id,
             "horizon_days": 90
-        }).json()
+        })
 
-        decision = requests.post(RL_URL, json={
+        decision = make_decision({
             "user_id": user_id,
             "current_state": {
                 "energy": 0.6,
                 "skills_ready": True
             }
-        }).json()
+        })
 
         set_state(user_id, "DONE")
 
@@ -55,3 +54,4 @@ def handle_message(user_id: str, text: str):
 
     return "Processing..."
 
+                       
