@@ -1,64 +1,22 @@
-version: '3.8'
+version: "3.9"
+
 services:
-  postgres:
-    image: postgres:15-alpine
-    environment:
-      POSTGRES_DB: aclsa
-      POSTGRES_USER: aclsa_user
-      POSTGRES_PASSWORD: aclsa_secure_password_2024
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U aclsa_user -d aclsa"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  state_service:
-    build: ./services/state_service
-    ports:
-      - "8001:8001"
-    depends_on:
-      postgres:
-        condition: service_healthy
-
-  memory_service:
+  memory:
     build: ./services/memory_service
-    ports:
-      - "8002:8002"
+    ports: ["8002:8002"]
 
-  planning_service:
+  planning:
     build: ./services/planning_service
-    ports:
-      - "8003:8003"
+    ports: ["8003:8003"]
 
-  rl_service:
+  rl:
     build: ./services/rl_service
-    ports:
-      - "8004:8004"
+    ports: ["8004:8004"]
 
-  ethics_service:
-    build: ./services/ethics_service
-    ports:
-      - "8005:8005"
-
-  api_gateway:
+  api:
     build: ./services/api_gateway
-    ports:
-      - "8000:8000"
+    ports: ["8000:8000"]
     depends_on:
-      - state_service
-      - memory_service
-      - planning_service
-      - rl_service
-      - ethics_service
-
-  frontend:
-    build: ./frontend
-    ports:
-      - "3000:3000"
-
-volumes:
-  postgres_data:
+      - memory
+      - planning
+      - rl
