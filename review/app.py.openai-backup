@@ -1,0 +1,142 @@
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import List, Dict, Optional
+import os
+from openai import OpenAI
+from datetime import datetime
+
+app = FastAPI(title="ACLSA AI Agent")
+
+# CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# OpenAI client
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+# Store conversation history per user
+conversations = {}
+
+class MessageRequest(BaseModel):
+    user_id: str
+    message: str
+    context: Optional[str] = None
+
+class MessageResponse(BaseModel):
+    response: str
+    timestamp: str
+    user_id: str
+
+@app.get("/health")
+def health():
+    return {"status": "healthy", "service": "aclsa-agent"}
+
+@app.post("/message", response_model=MessageResponse)
+async def send_message(request: MessageRequest):
+    """Main chat endpoint - handles user messages"""
+    
+    try:
+        # Initialize conversation history for new users
+        if request.user_id not in conversations:
+            conversations[request.user_id] = []
+        
+        # Add user message to history
+        conversations[request.user_id].append({
+            "role": "user",
+            "content": request.message
+        })
+        
+        # Keep only last 10 messages to avoid token limits
+        if len(conversations[request.user_id]) > 10:
+            conversations[request.user_id] = conversations[request.user_id][-10:]
+        
+        # System prompt for ACLSA
+        system_prompt = """You are ACLSA (AI-powered Course Learning Support Assistant), an intelligent AI agent designed to help students with their learning journey.
+
+Your capabilities:
+- Help students understand complex topics
+- Provide study recommendations and learning paths
+- Answer questions about various subjects
+- Create personalized learning plans
+- Offer career guidance and skill development advice
+- Track learning progress and suggest improvements
+
+You are friendly, encouraging, and educational. Always provide clear, helpful responses tailored to the student's needs."""
+
+        # Create messages for OpenAI
+        messages = [
+            {"role": "system", "content": system_prompt}
+        ] + conversations[request.user_id]
+        
+        # Call OpenAI API
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",  # Use gpt-4 if you have access
+            messages=messages,
+            temperature=0.7,
+            max_tokens=500
+        )
+        
+        # Extract assistant response
+        assistant_message = response.choices[0].message.content
+        
+        # Add assistant response to history
+        conversations[request.user_id].append({
+            "role": "assistant",
+            "content": assistant_message
+        })
+        
+        return MessageResponse(
+            response=assistant_message,
+            timestamp=datetime.utcnow().isoformat(),
+            user_id=request.user_id
+        )
+        
+    except Exception as e:
+        # Handle errors gracefully
+        error_message = f"I apologize, but I encountered an error: {str(e)}"
+        
+        if "api_key" in str(e).lower():
+            error_message = "I'm having trouble connecting to my AI service. Please check if the OpenAI API key is configured correctly."
+        
+        return MessageResponse(
+            response=error_message,
+            timestamp=datetime.utcnow().isoformat(),
+            user_id=request.user_id
+        )
+
+@app.post("/chat/reset")
+def reset_conversation(user_id: str):
+    """Reset conversation history for a user"""
+    if user_id in conversations:
+        conversations[user_id] = []
+    return {"status": "success", "message": "Conversation reset"}
+
+@app.get("/chat/history/{user_id}")
+def get_history(user_id: str):
+    """Get conversation history for a user"""
+    return {
+        "user_id": user_id,
+        "history": conversations.get(user_id, []),
+        "message_count": len(conversations.get(user_id, []))
+    }
+
+# Keep your existing RL endpoints
+@app.post("/rl/decide")
+def make_decision(request: dict):
+    """RL agent recommends optimal action"""
+    return {
+        "user_id": request.get("user_id"),
+        "recommended_action": "study_high_priority_skill",
+        "confidence": 0.85,
+        "rationale": "I've analyzed your situation and created a plan with a recommended next action."
+    }
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
