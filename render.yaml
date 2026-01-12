@@ -1,11 +1,11 @@
 services:
   - type: web
-    name: aclsa-agent-api
-    env: docker
+    name: aclsa-agent
+    env: python
+    region: oregon
     plan: free
-    dockerfilePath: services/api_gateway/Dockerfile
-    dockerContext: .
-    autoDeploy: true
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "cd review && uvicorn app:app --host 0.0.0.0 --port $PORT"
     envVars:
-      - key: PYTHONPATH
-        value: /app
+      - key: PYTHON_VERSION
+        value: 3.11.0
