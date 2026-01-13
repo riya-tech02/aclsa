@@ -236,7 +236,18 @@ What aspect would you like to explore first?"""
 @app.get("/health")
 def health():
     return {"status": "healthy", "service": "aclsa-agent"}
-
+@app.get("/")
+def root():
+    return {
+        "service": "ACLSA AI Agent",
+        "status": "running",
+        "version": "1.0",
+        "endpoints": {
+            "docs": "/docs",
+            "health": "/health",
+            "message": "/message"
+        }
+    }
 @app.post("/message", response_model=MessageResponse)
 async def send_message(request: MessageRequest):
     """Main chat endpoint - handles user messages"""
