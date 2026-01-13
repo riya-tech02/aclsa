@@ -10,7 +10,7 @@ export default function App() {
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [auth, setAuth] = useState(!!localStorage.getItem("token"));
+  const [auth, setAuth] = useState(true);  // Skip login for now
   const [mode, setMode] = useState("login");
   
   async function sendMessage() {
