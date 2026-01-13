@@ -26,14 +26,14 @@ export default function App() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
-          user_id: "riya", 
-          message: userText 
+          user_id: localStorage.getItem("userId") || "user_" + Date.now(),
+          message: userText,
+          context: null
         })
       });
       
       const data = await res.json();
       
-      // Add agent's response
       if (data.response) {
         setMessages(m => [...m, { role: "agent", text: data.response }]);
       } else {
