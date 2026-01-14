@@ -22,7 +22,7 @@ export default function App() {
     setLoading(true);
     
     try {
-      const res = await fetch(`${API}/message`, {
+      const res = await fetch(`${API}/message`,  {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
