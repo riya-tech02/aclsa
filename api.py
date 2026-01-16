@@ -4,10 +4,10 @@ from pydantic import BaseModel
 from typing import List, Dict, Optional
 from datetime import datetime
 import json
+import re
 
-app = FastAPI(title="ACLSA AI Agent")
+app = FastAPI(title="ACLSA Agentic AI System")
 
-# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -16,8 +16,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Store conversation history per user
+# User conversations and learning progress
 conversations = {}
+user_profiles = {}
+learning_plans = {}
 
 class MessageRequest(BaseModel):
     user_id: str
@@ -28,297 +30,527 @@ class MessageResponse(BaseModel):
     response: str
     timestamp: str
     user_id: str
+    metadata: Optional[Dict] = None
 
-def generate_intelligent_response(user_message: str, conversation_history: List[Dict]) -> str:
-    """
-    Smart response generator that understands context and provides helpful answers
-    """
-    message_lower = user_message.lower()
+# AGENTIC COMPONENTS
+
+class Agent:
+    """Main agentic AI that can plan, reason, and use tools"""
     
-    # Greeting responses
-    if any(word in message_lower for word in ['hello', 'hi', 'hey', 'greetings']):
-        return "Hello! I'm ACLSA, your AI-powered Course Learning Support Assistant. I'm here to help you with your learning journey. Whether you need help understanding a topic, creating a study plan, or getting career advice, I'm here for you. What would you like to learn about today?"
+    def __init__(self):
+        self.tools = {
+            "create_study_plan": self.create_study_plan,
+            "track_progress": self.track_progress,
+            "recommend_resources": self.recommend_resources,
+            "quiz_generator": self.generate_quiz,
+            "code_explainer": self.explain_code,
+            "career_advisor": self.career_advice
+        }
     
-    # Python learning
-    if 'python' in message_lower:
-        if 'learn' in message_lower or 'start' in message_lower or 'begin' in message_lower:
-            return """Great choice! Python is an excellent language to learn. Here's a structured path to get you started:
-
-**Week 1-2: Fundamentals**
-- Variables, data types (strings, numbers, lists, dictionaries)
-- Basic operators and expressions
-- Input/output operations
-
-**Week 3-4: Control Flow**
-- If/else statements
-- For and while loops
-- Functions and parameters
-
-**Week 5-6: Data Structures**
-- Lists and list comprehensions
-- Dictionaries and sets
-- Tuples and their use cases
-
-**Week 7-8: Object-Oriented Programming**
-- Classes and objects
-- Inheritance and polymorphism
-- Special methods
-
-**Recommended Resources:**
-- Practice on platforms like LeetCode, HackerRank
-- Build small projects (calculator, todo list, simple game)
-- Read "Python Crash Course" or "Automate the Boring Stuff"
-
-Would you like me to elaborate on any specific topic or help you with a particular concept?"""
+    def analyze_intent(self, message: str) -> Dict:
+        """Analyze user's intent and determine required actions"""
+        message_lower = message.lower()
+        
+        intents = {
+            "create_plan": any(w in message_lower for w in ['plan', 'roadmap', 'schedule', 'how to learn']),
+            "progress_check": any(w in message_lower for w in ['progress', 'how am i doing', 'track']),
+            "need_resources": any(w in message_lower for w in ['resource', 'book', 'course', 'tutorial', 'recommend']),
+            "quiz_me": any(w in message_lower for w in ['quiz', 'test', 'practice', 'question']),
+            "explain_code": any(w in message_lower for w in ['explain code', 'what does this do', 'how does']),
+            "career_help": any(w in message_lower for w in ['career', 'job', 'interview', 'resume']),
+            "general_question": True  # Default
+        }
+        
+        # Extract topic
+        topics = {
+            "python": "python" in message_lower,
+            "javascript": any(w in message_lower for w in ['javascript', 'js', 'react']),
+            "web_dev": any(w in message_lower for w in ['web', 'html', 'css', 'frontend', 'backend']),
+            "data_science": any(w in message_lower for w in ['data science', 'ml', 'machine learning', 'ai']),
+            "general": True
+        }
+        
+        active_topic = next((k for k, v in topics.items() if v), "general")
+        active_intents = [k for k, v in intents.items() if v]
+        
+        return {
+            "primary_intent": active_intents[0] if active_intents else "general_question",
+            "all_intents": active_intents,
+            "topic": active_topic,
+            "message": message
+        }
     
-    # Programming concepts
-    if any(word in message_lower for word in ['code', 'program', 'software', 'development']):
-        return """I can help you with various programming and software development topics! Here are some areas I can assist with:
-
-**Programming Languages:**
-- Python, JavaScript, Java, C++, and more
-- Syntax, best practices, and common patterns
-
-**Web Development:**
-- Frontend: HTML, CSS, JavaScript, React
-- Backend: APIs, databases, server architecture
-
-**Computer Science Concepts:**
-- Data structures (arrays, trees, graphs)
-- Algorithms (sorting, searching, dynamic programming)
-- Big O notation and complexity analysis
-
-**Software Engineering:**
-- Design patterns
-- Testing and debugging
-- Version control (Git)
-- Software architecture
-
-What specific topic would you like to dive into? Feel free to ask about any concept, and I'll break it down for you!"""
+    def plan_response(self, intent_analysis: Dict, user_id: str) -> Dict:
+        """Multi-step planning based on intent"""
+        intent = intent_analysis["primary_intent"]
+        topic = intent_analysis["topic"]
+        
+        plan = {
+            "steps": [],
+            "tools_needed": [],
+            "context": {}
+        }
+        
+        if intent == "create_plan":
+            plan["steps"] = [
+                "Assess current knowledge level",
+                "Create personalized learning path",
+                "Suggest resources and timeline",
+                "Set milestones"
+            ]
+            plan["tools_needed"] = ["create_study_plan"]
+            
+        elif intent == "progress_check":
+            plan["steps"] = ["Retrieve learning history", "Analyze progress", "Provide feedback"]
+            plan["tools_needed"] = ["track_progress"]
+            
+        elif intent == "need_resources":
+            plan["steps"] = ["Identify topic", "Curate resources", "Prioritize by level"]
+            plan["tools_needed"] = ["recommend_resources"]
+            
+        elif intent == "quiz_me":
+            plan["steps"] = ["Generate relevant questions", "Track answers", "Provide explanations"]
+            plan["tools_needed"] = ["quiz_generator"]
+            
+        elif intent == "career_help":
+            plan["steps"] = ["Assess skills", "Identify gaps", "Create action plan"]
+            plan["tools_needed"] = ["career_advisor"]
+        
+        plan["context"] = {"topic": topic, "user_id": user_id}
+        return plan
     
-    # Study help
-    if any(word in message_lower for word in ['study', 'learn', 'understand', 'explain']):
-        return """I'd be happy to help you learn! To provide the most effective guidance, I need to know:
-
-1. **What topic** are you studying? (e.g., mathematics, computer science, physics)
-2. **What's your current level?** (beginner, intermediate, advanced)
-3. **What's your goal?** (exam preparation, building projects, career change)
-
-I can help you by:
-- Breaking down complex concepts into simple explanations
-- Creating personalized study plans
-- Suggesting resources and practice problems
-- Providing step-by-step guidance on difficult topics
-- Helping you prepare for exams or interviews
-
-Tell me more about what you're trying to learn, and I'll create a customized learning path for you!"""
+    def execute_plan(self, plan: Dict) -> str:
+        """Execute the planned steps using available tools"""
+        results = []
+        
+        for tool_name in plan["tools_needed"]:
+            if tool_name in self.tools:
+                result = self.tools[tool_name](plan["context"])
+                results.append(result)
+        
+        # If no specific tools, provide intelligent response
+        if not results:
+            return self.general_response(plan["context"])
+        
+        return "\n\n".join(results)
     
-    # Career advice
-    if any(word in message_lower for word in ['career', 'job', 'interview', 'resume']):
-        return """I can definitely help with career guidance! Here's how I can assist:
-
-**Career Planning:**
-- Identify skills needed for your target role
-- Create a roadmap to reach your career goals
-- Suggest relevant courses and certifications
-
-**Job Search:**
-- Resume and portfolio tips
-- LinkedIn profile optimization
-- Job search strategies
-
-**Interview Preparation:**
-- Technical interview practice
-- Behavioral question strategies
-- System design discussions
-- Coding challenge practice
-
-**Skill Development:**
-- Identify gaps in your knowledge
-- Recommend learning resources
-- Project ideas to build your portfolio
-
-What specific aspect of your career would you like to focus on? Let me know your current situation and goals, and I'll provide tailored advice!"""
+    # TOOL IMPLEMENTATIONS
     
-    # Math help
-    if any(word in message_lower for word in ['math', 'calculus', 'algebra', 'geometry', 'statistics']):
-        return """I can help you with mathematics! Whether it's fundamental concepts or advanced topics, I'm here to assist. Here are some areas I cover:
+    def create_study_plan(self, context: Dict) -> str:
+        topic = context.get("topic", "programming")
+        
+        plans = {
+            "python": """📚 **Your Personalized Python Learning Plan**
 
-**Algebra:**
-- Linear equations and inequalities
-- Quadratic equations
-- Systems of equations
-- Functions and graphs
+**Phase 1: Foundations (Weeks 1-2)**
+- ✓ Variables, data types, operators
+- ✓ Control flow (if/else, loops)
+- ✓ Functions and modules
+- **Practice**: 30 min daily on HackerRank
 
-**Calculus:**
-- Limits and continuity
-- Derivatives and applications
-- Integrals and area calculation
-- Differential equations
+**Phase 2: Data Structures (Weeks 3-4)**
+- ✓ Lists, dictionaries, sets, tuples
+- ✓ List comprehensions
+- ✓ Working with files
+- **Project**: Build a todo list CLI app
 
-**Statistics & Probability:**
-- Descriptive statistics
-- Probability distributions
-- Hypothesis testing
-- Regression analysis
+**Phase 3: OOP & Advanced (Weeks 5-6)**
+- ✓ Classes and objects
+- ✓ Inheritance, polymorphism
+- ✓ Exception handling
+- **Project**: Create a mini library management system
 
-**Discrete Math:**
-- Logic and proofs
-- Set theory
-- Combinatorics
-- Graph theory
+**Phase 4: Real-World Skills (Weeks 7-8)**
+- ✓ Working with APIs
+- ✓ Database basics (SQLite)
+- ✓ Testing with pytest
+- **Final Project**: Build a REST API
 
-What mathematical concept would you like help with? I can explain the theory, work through examples, and provide practice problems!"""
+**Daily Commitment**: 1-2 hours
+**Resources**: Python Crash Course, Real Python, Codecademy
+**Check-ins**: Weekly progress reviews with me!
+
+Ready to start? I'll track your progress!""",
+            
+            "web_dev": """🌐 **Web Development Mastery Plan**
+
+**Month 1: Frontend Foundations**
+- Week 1-2: HTML5 & CSS3 (Flexbox, Grid)
+- Week 3-4: JavaScript ES6+ basics
+- **Project**: Portfolio website
+
+**Month 2: Interactive Web**
+- Week 1-2: DOM manipulation, events
+- Week 3-4: Fetch API, async/await
+- **Project**: Weather dashboard app
+
+**Month 3: Modern Framework**
+- Week 1-4: React fundamentals
+- **Project**: Todo app with React
+
+**Month 4: Full Stack**
+- Week 1-2: Node.js & Express
+- Week 3-4: Database integration
+- **Final Project**: Full-stack CRUD app
+
+**Milestones**: Deploy 1 project monthly
+**Resources**: MDN, FreeCodeCamp, Frontend Mentor""",
+            
+            "data_science": """📊 **Data Science Journey**
+
+**Foundation (Month 1)**
+- Python basics
+- NumPy, Pandas
+- Data visualization (Matplotlib, Seaborn)
+- **Project**: Analyze a real dataset
+
+**Statistics & ML (Month 2-3)**
+- Statistical concepts
+- Scikit-learn basics
+- Linear regression, classification
+- **Project**: Predictive model
+
+**Advanced Topics (Month 4)**
+- Neural networks intro
+- Deep learning basics
+- **Capstone**: End-to-end ML project
+
+**Tools**: Jupyter, Kaggle
+**Practice**: Daily Kaggle challenges""",
+        }
+        
+        return plans.get(topic, self.general_learning_plan(topic))
     
-    # Project help
-    if 'project' in message_lower:
-        return """Excellent! Working on projects is one of the best ways to learn. I can help you:
+    def track_progress(self, context: Dict) -> str:
+        user_id = context["user_id"]
+        
+        # Simulate progress tracking
+        return """📈 **Your Learning Progress**
 
-**Project Ideas by Level:**
+**This Week:**
+- ✅ Completed: 5 Python challenges
+- ✅ Study time: 8.5 hours
+- ✅ Projects: 1 in progress
 
-**Beginner Projects:**
-- Calculator application
-- Todo list app
-- Simple game (tic-tac-toe, hangman)
-- Weather app using APIs
+**Overall Progress:**
+- 🎯 Python Basics: 85% complete
+- 🎯 Data Structures: 60% complete
+- 🎯 OOP Concepts: 40% complete
 
-**Intermediate Projects:**
-- E-commerce website
-- Social media clone
-- Chat application
-- Personal finance tracker
+**Strengths:** 
+- Quick grasp of syntax
+- Good problem-solving skills
 
-**Advanced Projects:**
-- Machine learning model
-- Full-stack web application
-- Mobile app
-- Distributed system
+**Areas to Improve:**
+- Spend more time on OOP concepts
+- Practice more complex algorithms
 
-**Project Development Support:**
-- Architecture and design decisions
-- Technology stack recommendations
-- Code structure and best practices
-- Debugging and optimization
-- Deployment strategies
+**Next Milestone:** Complete OOP module by Friday
+**Recommendation:** Do 2 OOP practice problems today
 
-What kind of project are you interested in building? Tell me your skill level and interests, and I'll help you plan and execute it!"""
+Keep up the great work! 💪"""
     
-    # Default intelligent response
-    return f"""Thank you for your message! I'm ACLSA, and I'm here to help you learn and grow. 
+    def recommend_resources(self, context: Dict) -> str:
+        topic = context.get("topic", "general")
+        
+        resources = {
+            "python": """📖 **Top Python Resources**
 
-Based on your question about "{user_message}", I'd like to understand better how I can assist you. Here are some ways I can help:
+**📚 Books:**
+- "Python Crash Course" by Eric Matthes (Beginner)
+- "Fluent Python" by Luciano Ramalho (Advanced)
+- "Automate the Boring Stuff" (Practical)
 
-**Learning Support:**
-- Explain complex topics in simple terms
-- Create personalized study plans
-- Provide practice problems and examples
-- Break down difficult concepts step-by-step
+**💻 Online Platforms:**
+- Real Python (realp
 
-**Academic Assistance:**
-- Help with homework and assignments
-- Exam preparation strategies
-- Research and project guidance
+ython.com) - Excellent tutorials
+- Python.org docs - Official reference
+- Codecademy Python course - Interactive
 
-**Career Development:**
-- Skill development roadmaps
-- Interview preparation
-- Career transition advice
+**🎥 Video Courses:**
+- "Complete Python Bootcamp" on Udemy
+- Corey Schafer's YouTube channel
+- freeCodeCamp Python course
 
-**Technical Skills:**
-- Programming and software development
-- Data structures and algorithms
-- Web development and databases
+**🏆 Practice:**
+- LeetCode (Interview prep)
+- HackerRank (Challenges)
+- Project Euler (Math problems)
 
-Could you provide more details about what you'd like to learn or accomplish? The more specific you are, the better I can tailor my guidance to your needs!
+**🔧 Tools:**
+- VS Code with Python extension
+- PyCharm (IDE)
+- Jupyter Notebooks
 
-What aspect would you like to explore first?"""
+Start with "Python Crash Course" and practice on HackerRank daily!""",
+            
+            "javascript": """🚀 **JavaScript Learning Resources**
 
-@app.get("/health")
-def health():
-    return {"status": "healthy", "service": "aclsa-agent"}
+**Essential Reading:**
+- "Eloquent JavaScript" (Free online)
+- "You Don't Know JS" series
+- MDN Web Docs
+
+**Courses:**
+- freeCodeCamp JavaScript
+- JavaScript30 by Wes Bos
+- The Odin Project
+
+**Practice Platforms:**
+- Codewars
+- Exercism
+- Frontend Mentor (Projects)
+
+**Stay Updated:**
+- JavaScript Weekly newsletter
+- Dev.to JavaScript articles""",
+        }
+        
+        return resources.get(topic, "I can recommend resources for any tech topic! Just specify what you're learning.")
+    
+    def generate_quiz(self, context: Dict) -> str:
+        topic = context.get("topic", "python")
+        
+        return f"""🧠 **Quick {topic.title()} Quiz**
+
+**Question 1:** What's the difference between a list and a tuple in Python?
+a) Lists are mutable, tuples are immutable
+b) Tuples are faster than lists
+c) Lists use [], tuples use ()
+d) All of the above
+
+**Question 2:** What does this code output?
+```python
+x = [1, 2, 3]
+y = x
+y.append(4)
+print(x)
+```
+a) [1, 2, 3]
+b) [1, 2, 3, 4]
+c) Error
+d) None
+
+**Question 3:** Which is the correct way to define a function?
+a) function myFunc():
+b) def myFunc():
+c) func myFunc():
+d) define myFunc():
+
+Reply with your answers (e.g., "1a, 2b, 3b") and I'll check them!"""
+    
+    def explain_code(self, context: Dict) -> str:
+        return """💡 **Code Explanation Assistant**
+
+I can help explain code! Just paste the code and I'll break it down:
+
+**I can explain:**
+- What the code does
+- How it works step-by-step
+- Best practices and improvements
+- Common pitfalls
+
+**Example format:**
+```
+Explain this code:
+def fibonacci(n):
+    if n <= 1:
+        return n
+    return fibonacci(n-1) + fibonacci(n-2)
+```
+
+Paste your code and I'll explain it clearly!"""
+    
+    def career_advice(self, context: Dict) -> str:
+        return """💼 **Career Development Guidance**
+
+**🎯 Career Path Planning:**
+1. **Assess Your Skills**: What do you know well?
+2. **Identify Gaps**: What does your target role require?
+3. **Build Projects**: Create a portfolio
+4. **Network**: LinkedIn, tech communities
+5. **Apply Strategically**: Quality over quantity
+
+**📝 Resume Tips:**
+- Lead with impact (not just responsibilities)
+- Quantify achievements
+- Tailor to each job
+- Keep it 1-2 pages
+
+**🎤 Interview Prep:**
+- Practice coding problems daily (LeetCode)
+- Prepare STAR stories
+- Research the company
+- Ask thoughtful questions
+
+**🚀 Quick Wins:**
+- Build 2-3 portfolio projects
+- Contribute to open source
+- Write technical blog posts
+- Get active on GitHub
+
+**What's your target role?** I can create a specific action plan!"""
+    
+    def general_learning_plan(self, topic: str) -> str:
+        return f"""📚 **Learning Plan for {topic.title()}**
+
+**Phase 1: Foundation** (2-3 weeks)
+- Understand core concepts
+- Learn fundamental syntax/tools
+- Small practice exercises
+
+**Phase 2: Application** (3-4 weeks)
+- Build small projects
+- Apply concepts practically
+- Debug and problem-solve
+
+**Phase 3: Mastery** (4+ weeks)
+- Complex projects
+- Best practices
+- Performance optimization
+
+**Your next steps:**
+1. Define specific learning goals
+2. Allocate 1-2 hours daily
+3. Build projects, not just tutorials
+4. Join relevant communities
+
+Tell me more about your goals and I'll create a detailed plan!"""
+    
+    def general_response(self, context: Dict) -> str:
+        """Intelligent general responses"""
+        message = context.get("message", "").lower()
+        
+        if any(w in message for w in ['hello', 'hi', 'hey']):
+            return """👋 **Hello! I'm ACLSA - Your Agentic AI Learning Assistant**
+
+I'm not just a chatbot - I'm your intelligent learning partner with:
+
+✨ **Agentic Capabilities:**
+- 🎯 Create personalized study plans
+- 📊 Track your learning progress
+- 🧠 Generate quizzes and practice problems
+- 💡 Explain complex concepts
+- 🚀 Provide career guidance
+- 📚 Recommend curated resources
+
+**I can help you:**
+- Plan your learning journey
+- Master programming languages
+- Prepare for interviews
+- Build real projects
+- Advance your career
+
+**Just tell me:** What would you like to learn or achieve today?"""
+        
+        return f"""I'm here to help you learn and grow! 
+
+**I noticed you asked about:** "{context.get('message', '')}"
+
+I can assist with:
+- Creating custom learning plans
+- Tracking your progress
+- Recommending resources
+- Generating practice quizzes
+- Career guidance
+- Code explanations
+
+**How can I help you learn today?**"""
+
+# Initialize agent
+agent = Agent()
+
 @app.get("/")
 def root():
     return {
-        "service": "ACLSA AI Agent",
-        "status": "running",
-        "version": "1.0",
-        "endpoints": {
-            "docs": "/docs",
-            "health": "/health",
-            "message": "/message"
-        }
+        "service": "ACLSA Agentic AI System",
+        "version": "2.0",
+        "capabilities": [
+            "Multi-step planning",
+            "Tool usage",
+            "Progress tracking",
+            "Personalized learning paths",
+            "Career guidance"
+        ]
     }
+
+@app.get("/health")
+def health():
+    return {"status": "healthy", "service": "agentic-ai"}
+
 @app.post("/message", response_model=MessageResponse)
 async def send_message(request: MessageRequest):
-    """Main chat endpoint - handles user messages"""
+    """Agentic AI endpoint with planning and tool use"""
     
     try:
-        # Initialize conversation history for new users
+        # Initialize user
         if request.user_id not in conversations:
             conversations[request.user_id] = []
+            user_profiles[request.user_id] = {"topics": [], "level": "beginner"}
         
-        # Add user message to history
+        # Add to conversation history
         conversations[request.user_id].append({
             "role": "user",
-            "content": request.message
+            "content": request.message,
+            "timestamp": datetime.utcnow().isoformat()
         })
         
-        # Keep only last 10 messages to manage memory
-        if len(conversations[request.user_id]) > 10:
-            conversations[request.user_id] = conversations[request.user_id][-10:]
+        # AGENTIC WORKFLOW
+        # Step 1: Analyze intent
+        intent_analysis = agent.analyze_intent(request.message)
         
-        # Generate intelligent response
-        assistant_message = generate_intelligent_response(
-            request.message,
-            conversations[request.user_id]
-        )
+        # Step 2: Create plan
+        plan = agent.plan_response(intent_analysis, request.user_id)
         
-        # Add assistant response to history
+        # Step 3: Execute plan
+        response = agent.execute_plan(plan)
+        
+        # Add to conversation
         conversations[request.user_id].append({
             "role": "assistant",
-            "content": assistant_message
+            "content": response,
+            "timestamp": datetime.utcnow().isoformat(),
+            "metadata": {
+                "intent": intent_analysis["primary_intent"],
+                "tools_used": plan["tools_needed"]
+            }
         })
         
+        # Keep only last 20 messages
+        if len(conversations[request.user_id]) > 20:
+            conversations[request.user_id] = conversations[request.user_id][-20:]
+        
         return MessageResponse(
-            response=assistant_message,
+            response=response,
             timestamp=datetime.utcnow().isoformat(),
-            user_id=request.user_id
+            user_id=request.user_id,
+            metadata={
+                "intent": intent_analysis["primary_intent"],
+                "topic": intent_analysis["topic"],
+                "tools_used": plan["tools_needed"]
+            }
         )
         
     except Exception as e:
-        error_message = f"I apologize, but I encountered an error processing your message. Please try again or rephrase your question."
-        
         return MessageResponse(
-            response=error_message,
+            response=f"I encountered an error, but I'm still here to help! Could you rephrase your question?",
             timestamp=datetime.utcnow().isoformat(),
             user_id=request.user_id
         )
 
-@app.post("/chat/reset")
-def reset_conversation(user_id: str):
-    """Reset conversation history for a user"""
-    if user_id in conversations:
-        conversations[user_id] = []
-    return {"status": "success", "message": "Conversation reset"}
+@app.get("/user/{user_id}/profile")
+def get_user_profile(user_id: str):
+    """Get user learning profile"""
+    return user_profiles.get(user_id, {"message": "No profile found"})
 
-@app.get("/chat/history/{user_id}")
-def get_history(user_id: str):
-    """Get conversation history for a user"""
+@app.get("/user/{user_id}/history")
+def get_conversation_history(user_id: str):
+    """Get conversation history"""
     return {
         "user_id": user_id,
-        "history": conversations.get(user_id, []),
-        "message_count": len(conversations.get(user_id, []))
-    }
-
-# Keep your existing RL endpoints
-@app.post("/rl/decide")
-def make_decision(request: dict):
-    """RL agent recommends optimal action"""
-    return {
-        "user_id": request.get("user_id"),
-        "recommended_action": "study_high_priority_skill",
-        "confidence": 0.85,
-        "rationale": "Based on your current progress and goals, I recommend focusing on high-priority skills that align with your career objectives."
+        "conversations": conversations.get(user_id, []),
+        "total_messages": len(conversations.get(user_id, []))
     }
 
 if __name__ == "__main__":
