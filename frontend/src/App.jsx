@@ -53,23 +53,19 @@ export default function App() {
     }
   }
 
-  if (!auth) {
-    return mode === "login" ? (
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh", background: "#020617" }}>
-        <Login onLogin={() => setAuth(true)} />
-        <p style={{ color: "#38bdf8", cursor: "pointer", marginTop: 10 }} onClick={() => setMode("register")}>
-          Create account
-        </p>
-      </div>
-    ) : (
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh", background: "#020617" }}>
-        <Register onRegister={() => setMode("login")} />
-        <p style={{ color: "#38bdf8", cursor: "pointer", marginTop: 10 }} onClick={() => setMode("login")}>
-          Back to login
-        </p>
-      </div>
-    );
-  }
+ if (!auth) {
+  return mode === "login" ? (
+    <Login 
+      onLogin={() => setAuth(true)} 
+      onSwitchToRegister={() => setMode("register")}
+    />
+  ) : (
+    <Register 
+      onRegister={() => setMode("login")} 
+      onSwitchToLogin={() => setMode("login")}
+    />
+  );
+}
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "#020617", color: "#e5e7eb" }}>
